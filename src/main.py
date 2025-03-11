@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
+import os
 import logging
 import warnings
 import time
@@ -56,11 +57,12 @@ def process_file(file):
 if __name__ == "__main__":
     total_time = time.time()
 
-    # Input files
+    # Input files: read all files in the data/books directory
+    data_dir = "data/books"
     test_files = [
-        "data/franz-kafka_metamorphosis.epub",
-        "data/the_stranger.pdf",
-        "data/The-Bell-Jar-1645639705._vanilla.xml"
+        os.path.join(data_dir, f)
+        for f in os.listdir(data_dir)
+        if os.path.isfile(os.path.join(data_dir, f))
     ]
 
     book_summaries = []

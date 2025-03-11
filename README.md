@@ -25,7 +25,11 @@ Add your OpenAI API key to the environment variables:
 export OPENAI_API_KEY=your_api_key_here
 ```
 
-### 3. Run the Application
+### 3. Add books
+Add any books you want to analyze to the `data/books` directory.
+
+
+### 4. Run the Application
 Execute the main script to process the books and generate the essay:
 
 ```bash
