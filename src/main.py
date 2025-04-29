@@ -1,13 +1,15 @@
 from concurrent.futures import ThreadPoolExecutor
 import os
+import sys
 import logging
 import warnings
 import time
 from api import gpt
 from utils import file_parser, text_chunker
+import json
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(stream=sys.stderr, level=logging.INFO)
 httpx_logger = logging.getLogger("httpx")
 httpx_logger.setLevel(logging.WARNING)
 warnings.filterwarnings("ignore", category=FutureWarning)
@@ -25,7 +27,7 @@ def process_file(file):
         content = file_parser.ingest_file(file)
 
         # Maybe chunk the book
-        chunks = text_chunker.chunk_text(content, force_chunking=True)
+        chunks = text_chunker.chunk_text(content, force_chunking=False)
 
         summaries = []
         if len(chunks) == 1:
@@ -57,13 +59,17 @@ def process_file(file):
 if __name__ == "__main__":
     total_time = time.time()
 
-    # Input files: read all files in the data/books directory
-    data_dir = "data/books"
-    test_files = [
-        os.path.join(data_dir, f)
-        for f in os.listdir(data_dir)
-        if os.path.isfile(os.path.join(data_dir, f))
-    ]
+    # Determine input files
+    args = sys.argv[1:]
+    if args:
+        test_files = args
+    else:
+        data_dir = "data/books"
+        test_files = [
+            os.path.join(data_dir, f)
+            for f in os.listdir(data_dir)
+            if os.path.isfile(os.path.join(data_dir, f))
+        ]
 
     book_summaries = []
 
@@ -82,6 +88,7 @@ if __name__ == "__main__":
         logging.info(f"Generated final essay in {elapsed_time:.2f} seconds")
 
         with open("comparative_report.txt", "w", encoding="utf-8") as output:
+            print(json.dumps(comparative_report))
             output.write(comparative_report)
 
     total_elapsed_time = time.time() - total_time
