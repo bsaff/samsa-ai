@@ -3,38 +3,59 @@ import logging
 import os
 import time
 from openai import OpenAI
+import re
 
 client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 
-def summarize_chunk(chunk):
+def extract_retry_ms(log: str):
+    if "rate_limit_exceeded" in log:
+        match = re.search(r'please try again in (\d+)ms', log, re.IGNORECASE)
+        if match:
+            return int(match.group(1))
+    return None
+
+def summarize_chunk(chunk, max_retries=3):
     """
     Summarizes a single chunk of a book using the Chat API.
+    Retries if rate limit is hit.
 
     :param chunk: The text chunk to summarize.
+    :param max_retries: Maximum number of retries before giving up.
     :return: Summary of the chunk or an error message.
     """
-    try:
-        logging.info(f"Summarizing chunk...")
-        response = client.chat.completions.create(model="gpt-4o-mini",
-            messages=[
-            {
-                "role": "system",
-                "content": "You are an assistant summarizing parts of a book. Focus on capturing the key points, events, and details accurately and factually. Do not provide analysis or commentary."
-                # Leveraging the book's organizational structure (chapters, sections, roman numerals, etc), provide citations for critical narrative events.
-            },
-            {
-                "role": "user",
-                "content": f"Summarize the following text. Provide an objective overview of the events, characters, and significant details described in the passage. Avoid interpretation, commentary, or thematic analysis.\n\n{chunk}"
-                # For every event or detail mentioned, include a citation in parentheses indicating where the detail occurred.
-            }
-            ],
-            max_tokens=2000,
-            temperature=0.7
-        )
-        return response.choices[0].message.content
-    except Exception as e:
-        logging.error(f"Error summarizing chunk: {e}")
-        return f"Error summarizing chunk: {e}"
+    attempt = 0
+    while attempt <= max_retries:
+        try:
+            logging.info(f"Summarizing chunk... Attempt {attempt + 1}")
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are an assistant summarizing parts of a book. Focus on capturing the key points, events, and details accurately and factually. Do not provide analysis or commentary."
+                    },
+                    {
+                        "role": "user",
+                        "content": f"Summarize the following text. Provide an objective overview of the events, characters, and significant details described in the passage. Avoid interpretation, commentary, or thematic analysis.\n\n{chunk}"
+                    }
+                ],
+                max_tokens=2000,
+                temperature=0.7
+            )
+            return response.choices[0].message.content
+
+        except Exception as e:
+            log_msg = str(e)
+            logging.error(f"Error summarizing chunk: {log_msg}")
+
+            retry_ms = extract_retry_ms(log_msg)
+            if retry_ms:
+                time.sleep(retry_ms / 1000)
+                attempt += 1
+            else:
+                break
+
+    return f"Error summarizing chunk after {max_retries} retries."
 
 def generate_summaries_threaded(chunks):
     """
