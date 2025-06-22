@@ -81,11 +81,12 @@ def generate_summaries_threaded(chunks):
     return summaries
 
 
-def summarize_book(summaries):
+def summarize_book(summaries, prompt):
     """
     Use partial book summaries to create a full book summary.
 
     :param summaries: List of summary strings, one per chunk.
+    :param prompt: Essay generation prompt.
     :return: A single string representing the cohesive book-wide summary.
     """
     combined_summaries = "\n\n".join(summaries)
@@ -99,11 +100,11 @@ def summarize_book(summaries):
             messages=[
                 {
                     "role": "system",
-                    "content": "You are an assistant tasked with summarizing a book. Focus on crafting a cohesive and thematic summary based on provided text. The theme of social isolation should be emphasized in your final summary."
+                    "content": f"You are an assistant tasked with summarizing a book. Focus on crafting a cohesive and thematic summary based on provided text. Keep in mind these summaries will be used to craft an essay based on the following prompt: {prompt}"
                 },
                 {
                     "role": "user",
-                    "content": f"Read the following text and output a comprehensive summary of the novel. Ensure the summary includes vivid, specific events, symbols, and imagery that emphasize the theme of social isolation. Avoid redundant details.\n\n{combined_summaries}"
+                    "content": f"Read the following text and output a comprehensive summary of the novel. Ensure the summary includes vivid, specific events, symbols, and imagery that emphasize the theme outlined in this prompt: {prompt}. Avoid redundant details.\n\n{combined_summaries}"
                 }
             ],
             max_tokens=2000,
@@ -118,16 +119,24 @@ def summarize_book(summaries):
         logging.error(f"Error generating book-wide summary: {e}")
         return None
 
-def generate_comparative_book_report(book_summaries):
+def generate_comparative_book_report(book_summaries, prompt=None):
     """
-    Generates a comparative book report based on the summaries of multiple books.
+    Generates a comparative book report based on the summaries of multiple books and a user-supplied prompt.
 
     :param book_summaries: List of summaries for each book.
+    :param prompt: The prompt for the comparative essay (string).
     :return: A 5-paragraph comparative book report as a string.
     """
 
     # Combine all book summaries into a single input string
-    combined_summaries = "\n\n".join([f"Book Summary:\n{summary}" for summary in enumerate(book_summaries)])
+    combined_summaries = "\n\n".join([f"Book Summary:\n{summary}" for summary in book_summaries])
+
+    if not prompt:
+        prompt = (
+            "Using the following book summaries, write a five paragraph comparative literature essay. "
+            "Focus on analyzing how each book addresses the theme of social isolation, presenting a clear thesis, "
+            "providing interesting intertextual comparisons, and concluding with a synthesis of the analysis."
+        )
 
     try:
         logging.info("Generating comparative book report...")
@@ -142,7 +151,7 @@ def generate_comparative_book_report(book_summaries):
                 },
                 {
                     "role": "user",
-                    "content": f"Using the following book summaries, write a five paragraph comparative literature essay. Focus on analyzing how each book addresses the theme of social isolation, presenting a clear thesis, providing interesting intertextual comparisons, and concluding with a synthesis of the analysis.\n\n{combined_summaries}"
+                    "content": f"{prompt}\n\n{combined_summaries}"
                 }
             ],
             temperature=0.7

@@ -1,5 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 import os
+from itertools import repeat
 import sys
 import logging
 import warnings
@@ -14,16 +15,17 @@ httpx_logger = logging.getLogger("httpx")
 httpx_logger.setLevel(logging.WARNING)
 warnings.filterwarnings("ignore", category=FutureWarning)
 
-def process_file(file):
+def process_file(file, prompt):
     """
     Process a single file: parse, chunk, summarize, and ouput book summary.
 
     :param file: Path to the input file.
+    :param prompt: The essay prompt to guide summary generation.
     :return: A summary of the book.
     """
     try:
         # Parse the file
-        logging.info(f"Processing file: {file}")
+        logging.info(f"Processing file: {file} with prompt: {prompt[:50]}...")
         content = file_parser.ingest_file(file)
 
         # Maybe chunk the book
@@ -41,7 +43,7 @@ def process_file(file):
 
         # Combine chunk summaries into a full book summary
         start_time = time.time()
-        book_summary = gpt.summarize_book(summaries)
+        book_summary = gpt.summarize_book(summaries, prompt)
         elapsed_time = time.time() - start_time
         logging.info(f"Summarized full book in {elapsed_time:.2f} seconds")
 
@@ -59,10 +61,15 @@ def process_file(file):
 if __name__ == "__main__":
     total_time = time.time()
 
-    # Determine input files
-    args = sys.argv[1:]
-    if args:
-        test_files = args
+    # Determine input files and essay prompt
+    if len(sys.argv) > 1:
+        essay_prompt = sys.argv[1]
+    else:
+        essay_prompt = "Compare and contrast the books."
+
+    file_paths = sys.argv[2:]
+    if file_paths:
+        test_files = file_paths
     else:
         data_dir = "data/books"
         test_files = [
@@ -75,7 +82,7 @@ if __name__ == "__main__":
 
     # Use ThreadPoolExecutor to process files in parallel
     with ThreadPoolExecutor() as executor:
-        results = list(executor.map(process_file, test_files))
+        results = list(executor.map(process_file, test_files, repeat(essay_prompt)))
 
     # Collect summaries
     book_summaries = [summary for summary in results if summary is not None]
@@ -83,7 +90,7 @@ if __name__ == "__main__":
     # Generate a comparative book report
     if book_summaries:
         start_time = time.time()
-        comparative_report = gpt.generate_comparative_book_report(book_summaries)
+        comparative_report = gpt.generate_comparative_book_report(book_summaries, essay_prompt)
         elapsed_time = time.time() - start_time
         logging.info(f"Generated final essay in {elapsed_time:.2f} seconds")
 
